@@ -1,0 +1,179 @@
+/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-3-Clause) */
+/*
+ * Based on https://github.com/linux-can/can-utils/blob/master/candump.c
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+#include <libgen.h>
+#include <time.h>
+#include <errno.h>
+
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sys/uio.h>
+#include <net/if.h>
+
+#include <linux/can.h>
+#include <linux/can/raw.h>
+
+#include "lib.h"
+
+int main(int argc, char **argv)
+{
+    static __u32 dropcnt;
+    static __u32 last_dropcnt;
+    const int canfd_on = 1;
+    static volatile int running = 1;
+
+	fd_set rdfs;
+	int s;
+	int ret;
+	char *devname;
+	struct sockaddr_can addr;
+	char ctrlmsg[CMSG_SPACE(sizeof(struct timeval) + 3*sizeof(struct timespec) + sizeof(__u32))];
+	struct iovec iov;
+	struct msghdr msg;
+	struct cmsghdr *cmsg;
+	struct canfd_frame frame;
+	int nbytes, maxdlen;
+	struct ifreq ifr;
+
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <device>\n", argv[0]);
+        return 1;
+    }
+
+    devname = argv[1];
+
+    s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+    if (s < 0) {
+        perror("socket");
+        return 1;
+    }
+
+    nbytes = strlen(devname);
+    addr.can_family = AF_CAN;
+
+    memset(&ifr.ifr_name, 0, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, devname, nbytes);
+
+    if (ioctl(s, SIOCGIFINDEX, &ifr) < 0) {
+        perror("SIOCGIFINDEX");
+        exit(1);
+    }
+    addr.can_ifindex = ifr.ifr_ifindex;
+
+    /* try to switch the socket into CAN FD mode */
+    setsockopt(s, SOL_CAN_RAW, CAN_RAW_FD_FRAMES, &canfd_on, sizeof(canfd_on));
+
+    if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        perror("bind");
+        return 1;
+    }
+
+	/* these settings are static and can be held out of the hot path */
+	iov.iov_base = &frame;
+	msg.msg_name = &addr;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = &ctrlmsg;
+
+	struct canfd_frame out;
+	int booted = 0;
+
+	while (running) {
+		FD_ZERO(&rdfs);
+        FD_SET(s, &rdfs);
+
+        if (FD_ISSET(s, &rdfs)) {
+            /* these settings may be modified by recvmsg() */
+            iov.iov_len = sizeof(frame);
+            msg.msg_namelen = sizeof(addr);
+            msg.msg_controllen = sizeof(ctrlmsg);
+            msg.msg_flags = 0;
+
+            nbytes = recvmsg(s, &msg, 0);
+
+            if (nbytes < 0) {
+                if ((errno == ENETDOWN)) {
+                    fprintf(stderr, "%s: interface down\n", devname);
+                    continue;
+                }
+                perror("read");
+                return 1;
+            }
+
+            if ((size_t)nbytes == CAN_MTU)
+                maxdlen = CAN_MAX_DLEN;
+            else if ((size_t)nbytes == CANFD_MTU)
+                maxdlen = CANFD_MAX_DLEN;
+            else {
+                fprintf(stderr, "read: incomplete CAN frame\n");
+                return 1;
+            }
+
+            for (cmsg = CMSG_FIRSTHDR(&msg);
+                 cmsg && (cmsg->cmsg_level == SOL_SOCKET);
+                 cmsg = CMSG_NXTHDR(&msg,cmsg)) {
+                if (cmsg->cmsg_type == SO_RXQ_OVFL)
+                    memcpy(&dropcnt, CMSG_DATA(cmsg), sizeof(__u32));
+            }
+
+            /* check for (unlikely) dropped frames on this specific socket */
+            if (dropcnt != last_dropcnt) {
+
+                __u32 frames = dropcnt - last_dropcnt;
+                printf("DROPCOUNT: dropped %d CAN frame%s on '%s' socket (total drops %d)\n",
+                       frames, (frames > 1)?"s":"", devname, dropcnt);
+
+                last_dropcnt = dropcnt;
+            }
+
+            if ((frame.can_id & CAN_EFF_MASK) == 0x0E094000) {
+                if (frame.data[0] == 0x00 && frame.data[1] == 0x1C) {
+                    // Wake up
+                    printf("Wake up received! Booting up...\n");
+                    booted = 1;
+                    int required_mtu = parse_canframe("0E094021#000C", &out);
+                    if (write(s, &out, required_mtu) != required_mtu) {
+                        perror("write");
+                        return 1;
+                    }
+                } 
+                else if (frame.data[0] == 0x00 && frame.data[1] == 0x1E) {
+                    // Status request
+                    printf("Status request received! Booted state: %d\n", booted);
+                    int required_mtu = parse_canframe(booted ? "0E094021#000E" : "0E094021#000A", &out);
+                    if (write(s, &out, required_mtu) != required_mtu) {
+                        perror("write");
+                        return 1;
+                    }
+                } 
+                else if (frame.data[0] == 0x00 && frame.data[1] == 0x1A) {
+                    // Sleep
+                    printf("Sleep command received! Shutting down...\n");
+                    int required_mtu = parse_canframe("0E094021#000A", &out);
+                    if (write(s, &out, required_mtu) != required_mtu) {
+                        perror("write");
+                        return 1;
+                    }
+                    booted = 0;
+                }
+            }
+
+
+        }
+
+        fflush(stdout);
+	}
+
+    close(s);
+	return 0;
+}
