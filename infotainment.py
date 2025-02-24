@@ -18,7 +18,8 @@ from TextMessage import TextMessage
 
 def is_can_interface_up(interface):
     result = subprocess.run(['ip', 'link', 'show', interface], capture_output=True, text=True)
-    return 'state UP' in result.stdout
+    print(result.stdout)
+    return 'UP' in result.stdout and 'state' in result.stdout
 
 try:
     can_interface = 'vcan0' if os.uname()[4] == 'x86_64' else 'can0'
