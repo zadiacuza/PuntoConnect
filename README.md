@@ -21,4 +21,3 @@ And then replay the bus when using the vcan0
 ```bash
 canplayer -I candump-*.log
 ```
-
