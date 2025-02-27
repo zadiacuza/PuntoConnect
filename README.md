@@ -210,3 +210,59 @@ If you have multiple audio outputs and want to set a default:
    ```
 
    Replace `[SINK_NAME]` with the name of your desired audio sink.
+
+# Waveshare CAN hat setup
+setup for the can hat
+
+1 . **Edit `/boot/config.txt`:**  
+   ```bash
+   sudo nano /boot/config.txt
+   ```
+-2. **Use this configuration:**  
+   ```ini
+   dtparam=spi=on
+   dtoverlay=mcp2515-can0,oscillator=12000000,interrupt=25
+   dtoverlay=spi0-cs,cs0_pin=8
+   ```
+   - **`oscillator=12000000`** → This matches 
+
+3. **Reboot the Raspberry Pi:**  
+   ```bash
+   sudo reboot
+   ```
+
+---
+
+## **Check if the CAN Interface is Detected**
+1. **Check boot logs for MCP2515 detection:**  
+   ```bash
+   dmesg | grep -i mcp
+   ```
+   You should see something like:  
+   ```
+   mcp251x spi0.0: MCP2515 successfully initialized.
+   ```
+
+2. **Check available network interfaces:**  
+   ```bash
+   ip link show
+   ```
+   If successful, you should see `can0`.
+
+---
+
+## **Enable and Test CAN Communication**
+1. **Bring up the CAN interface:**  
+   ```bash
+   sudo ip link set can0 up type can bitrate 50000
+   ```
+   add ```loopback``` for testing
+2. **Verify the CAN interface is active:**  
+   ```bash
+   ip -details link show can0
+   ```
+
+3. **Start listening to CAN messages:**  
+   ```bash
+   candump can0
+   ```
