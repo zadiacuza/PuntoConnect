@@ -1,8 +1,0 @@
-#!/bin/bash
-set -e
-PART=/dev/mmcblk0p3
-MOUNTPOINT=/data
-
-mkdir -p $MOUNTPOINT
-fsck.ext4 -y $PART
-mount $PART $MOUNTPOINT
