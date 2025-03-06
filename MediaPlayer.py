@@ -42,11 +42,11 @@ class MediaPlayer:
 
         self.play_status_executor = ThreadPoolExecutor(max_workers=1)
         self.player_executor = ThreadPoolExecutor(max_workers=4)
-        dbus_thread = ExceptionAwareThread(target=self.start)
+        dbus_thread = ExceptionHandling(target=self.start)
         dbus_thread.start()
 
     def start(self):
-        self.connect_thread = ExceptionAwareThread(target=self.connect_device)
+        self.connect_thread = ExceptionHandling(target=self.connect_device)
         self.connect_thread.start()
         self.mainloop.run()
 

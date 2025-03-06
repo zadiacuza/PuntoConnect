@@ -5,7 +5,7 @@ from ExceptionHandling import ExceptionHandling
 from CANProtocol import *
 
 
-class CanHeartbeatLoop(ExceptionHandling):
+class HeartBeatLoop(ExceptionHandling):
 
     should_run = True
     track_position = 0

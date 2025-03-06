@@ -26,7 +26,7 @@ class PhoneHandler:
                                      dbus_interface="org.ofono.VoiceCall",
                                      signal_name="PropertyChanged")
 
-        thread = ExceptionAwareThread(target=self.start)
+        thread = ExceptionHandling(target=self.start)
         thread.start()
 
     def on_signal(self, *args, **kwargs):

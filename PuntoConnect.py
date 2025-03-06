@@ -6,10 +6,12 @@ import subprocess
 
 from MediaPlayer import MediaPlayer
 from BodyControlModule import BodyControlModule
+from HeartBeatLoop import HeartBeatLoop
 from DashboardPanel import Dashboard
 from MenuHandler import Menu
 from PhoneHandler import PhoneHandler
 from MessageHandler import MessageHandler
+
 
 def is_can_interface_up(interface):
     result = subprocess.run(['ip', 'link', 'show', interface], capture_output=True, text=True)
@@ -27,8 +29,12 @@ try:
     
     body_control = BodyControlModule(bus)
     body_control.start()
+    
+    
+    onehz_loop = HeartBeatLoop(bus)
+    onehz_loop.start()
 
-    textmessage = TextMessage(bus)
+    textmessage = MessageHandler(bus)
     menu = Menu()
     player = MediaPlayer(textmessage)
     phone = PhoneHandler()
@@ -36,15 +42,21 @@ try:
     dashpanel = Dashboard(textmessage)
 
     body_control.on_event('audio_channel', player.on_audio_channel)
+    
     menu.on_event('item', dashpanel.on_menu)
-    dashpanel.on_event('menu_opened', dashpanelbtns.on_menu_opened)
+    
+    dashpanel.on_event('menu_opened', onehz_loop.on_menu_opened)
+    dashpanel.on_event('menu_opened', btns.on_menu_opened)
+    
     player.on_event('position', onehz_loop.on_bt_position)
     player.on_event('playing', onehz_loop.on_bt_playing)
-    dashpanelbtns.on_event('menu', menu.on_button)
-    dashpanelbtns.on_event('media', player.on_button)
-    dashpanelbtns.on_event('phone', phone.on_button)
+    
+    btns.on_event('menu', menu.on_button)
+    btns.on_event('media', player.on_button)
+    btns.on_event('phone', phone.on_button)
+    
     phone.on_event('call', onehz_loop.on_phone)
-    phone.on_event('call', dashpanelbtns.on_phone)
+    phone.on_event('call', btns.on_phone)
     phone.on_event('call', dashpanel.on_phone)
 
     print("Entering main loop")

@@ -9,12 +9,12 @@ class BodyControlModule(ExceptionHandling):
 
     should_run = True
     listeners = {}
-    buttons = None
+    btns = None
 
     def __init__(self, bus):
         super().__init__()
         self.bus = bus
-        self.buttons = BodyButtons()
+        self.btns = BodyButtons()
         # self.door_status = DoorStatus(bus)
 
     def try_run(self):
@@ -33,21 +33,21 @@ class BodyControlModule(ExceptionHandling):
 
                 if message.arbitration_id == M001_BUTTONS:  # buttons
                     if payload & MASK_BUTTON_VOLUME_UP == MASK_BUTTON_VOLUME_UP:
-                        self.buttons.handle_debounce('vol+')
+                        self.btns.handle_debounce('vol+')
                     if payload & MASK_BUTTON_VOLUME_DN == MASK_BUTTON_VOLUME_DN:
-                        self.buttons.handle_debounce('vol-')
+                        self.btns.handle_debounce('vol-')
                     if payload & MASK_BUTTON_WINDOWS == MASK_BUTTON_WINDOWS:
-                        self.buttons.handle_debounce('win')
+                        self.btns.handle_debounce('win')
                     if payload & MASK_BUTTON_MUTE == MASK_BUTTON_MUTE:
-                        self.buttons.handle_debounce('mute')
+                        self.btns.handle_debounce('mute')
                     if payload & MASK_BUTTON_UP == MASK_BUTTON_UP:
-                        self.buttons.handle_debounce('up')
+                        self.btns.handle_debounce('up')
                     if payload & MASK_BUTTON_DOWN == MASK_BUTTON_DOWN:
-                        self.buttons.handle_debounce('down')
+                        self.btns.handle_debounce('down')
                     if payload & MASK_BUTTON_MENU == MASK_BUTTON_MENU:
-                        self.buttons.handle_debounce('menu')
+                        self.btns.handle_debounce('menu')
                     if payload & MASK_BUTTON_SOURCE == MASK_BUTTON_SOURCE:
-                        self.buttons.handle_debounce('src')
+                        self.btns.handle_debounce('src')
 
                 elif message.arbitration_id == BCAN_CLOCK:
                     if not date_sync:

@@ -45,7 +45,7 @@ class BodyButtons:
                 self.trigger_event('media', button)
                 
                 # Windows button → Trigger Assistant
-        if button == 'windows':
+        if button == 'win':
             print("[buttons] triggering assistant")
             self.trigger_event('assistant')
             # self.trigger_google_assistant()
